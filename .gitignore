@@ -1,0 +1,48 @@
+# Ignore the .gitignore folder in the root path
+*.png
+*.txt
+
+# Terraform state files
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+crash.log
+
+# Kubernetes service account tokens and certificates
+*.crt
+*.key
+sa_token.txt
+
+# Sensitive data files
+*.pem
+*.pfx
+*.cer
+*.der
+
+# Local environment files
+.env
+.env.*
+
+# Logs and debug files
+*.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE and editor directories and files
+.idea/
+.vscode/
+*.swp
+*~
+
+# Ignore any other sensitive files
+secrets/
+credentials/
+
+# Ansible Vault files (if applicable)
+*.vault
+
+# Ignore entire terraform cache data
+**/.terraform/*
