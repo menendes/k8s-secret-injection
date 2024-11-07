@@ -2,6 +2,7 @@
 *.png
 *.txt
 *.lock
+*.hcl
 
 # Terraform state files
 *.tfstate
