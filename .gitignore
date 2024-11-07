@@ -1,6 +1,7 @@
 # Ignore the .gitignore folder in the root path
 *.png
 *.txt
+*.lock
 
 # Terraform state files
 *.tfstate
