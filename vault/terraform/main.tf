@@ -1,5 +1,5 @@
 provider "vault" {
-  address = "http://192.168.49.2:32724" # Replace with the Vault address if different, in this case this ip represent my minikube ip
+  address = "http://192.168.49.2:31735" # Replace with the Vault address if different, in this case this ip represent my minikube ip
   token   = var.vault_token
 }
 
