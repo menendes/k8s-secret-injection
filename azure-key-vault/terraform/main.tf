@@ -1,82 +1,98 @@
+# Configure the Azure Resource Manager provider
 provider "azurerm" {
   features {}
 }
 
-# Resource Group
-resource "azurerm_resource_group" "rg" {
-  name     = "rg-external-secrets-demo"
-  location = "<Your-Azure-Region>"
+# Configure the Azure Active Directory provider, using tenant ID from azurerm_client_config
+provider "azuread" {
+  tenant_id = data.azurerm_client_config.current.tenant_id
 }
 
-# Key Vault
-resource "azurerm_key_vault" "kv" {
-  name                = "kv-external-secrets-demo"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  tenant_id           = "<Your-Azure-Tenant-ID>"
+# Retrieve the current Azure account configuration
+data "azurerm_client_config" "current" {}
 
-  sku_name = "standard"
+# Variables for resource names
+variable "resource_group_name" {
+  default = "rg-eso-demo"
+}
 
+# Replace it with your region
+variable "location" {
+  default = "West Europe"
+}
+
+variable "vault_name" {
+  default = "kv-esodemo"
+}
+
+# Create a Resource Group
+resource "azurerm_resource_group" "rg" {
+  name     = var.resource_group_name
+  location = var.location
+}
+
+# Create an Azure Key Vault, using tenant ID from data source
+resource "azurerm_key_vault" "vault" {
+  name                        = var.vault_name
+  location                    = azurerm_resource_group.rg.location
+  resource_group_name         = azurerm_resource_group.rg.name
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  sku_name                    = "standard"
+  soft_delete_retention_days  = 7
+
+  # Access policy for the current user (for management purposes)
   access_policy {
-    tenant_id = "<Your-Azure-Tenant-ID>"
-    object_id = "<Your-Service-Principal-Object-ID>"
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
 
-    secret_permissions = [
-      "get",
-      "list",
-    ]
+    secret_permissions = ["Get", "List", "Set", "Delete", "Purge"]
   }
 }
 
-# Secret in Key Vault
-resource "azurerm_key_vault_secret" "secret" {
-  name         = "my-secret"
-  value        = "super-secret-value"
-  key_vault_id = azurerm_key_vault.kv.id
+# Add secrets to the Key Vault
+resource "azurerm_key_vault_secret" "example_secret" {
+  name         = "webapp-username"
+  value        = "azure-example-username"
+  key_vault_id = azurerm_key_vault.vault.id
 }
 
-# Service Principal for ESO
-resource "azurerm_application" "app" {
-  name                       = "app-external-secrets-operator"
-  available_to_other_tenants = false
+resource "azurerm_key_vault_secret" "example_password" {
+  name         = "webapp-password"
+  value        = "azure-example-password"
+  key_vault_id = azurerm_key_vault.vault.id
 }
 
-resource "azurerm_application_password" "app_password" {
-  application_object_id = azurerm_application.app.object_id
-  value                 = "ChangeThisToASecurePassword"
-  end_date_relative     = "8760h" # 1 year
+# Create an Azure AD Application for ESO to access the Key Vault
+resource "azuread_application" "eso_app" {
+  display_name = "ESOServicePrincipal"
 }
 
-resource "azurerm_service_principal" "sp" {
-  application_id               = azurerm_application.app.application_id
-  app_role_assignment_required = false
+# Create a Service Principal for the application
+resource "azuread_service_principal" "eso_sp" {
+  client_id = azuread_application.eso_app.client_id
 }
 
-# Assign Key Vault permissions to the Service Principal
-resource "azurerm_key_vault_access_policy" "sp_access_policy" {
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = "<Your-Azure-Tenant-ID>"
-  object_id    = azurerm_service_principal.sp.object_id
-
-  secret_permissions = [
-    "get",
-    "list",
-  ]
+# Create a password (client secret) for the Service Principal
+resource "azuread_application_password" "eso_app_password" {
+  application_id = azuread_application.eso_app.id
 }
 
-# Output the Service Principal credentials
+# Assign Key Vault access to the Service Principal
+resource "azurerm_key_vault_access_policy" "eso_kv_access" {
+  key_vault_id = azurerm_key_vault.vault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azuread_service_principal.eso_sp.object_id
+
+  # Grant permissions for ESO to access secrets
+  secret_permissions = ["Get", "List"]
+}
+
+# Output Service Principal credentials
 output "client_id" {
-  value = azurerm_application.app.application_id
+  value = azuread_application.eso_app.client_id
 }
 
 output "client_secret" {
-  value = azurerm_application_password.app_password.value
-}
-
-output "tenant_id" {
-  value = "<Your-Azure-Tenant-ID>"
-}
-
-output "subscription_id" {
-  value = "<Your-Azure-Subscription-ID>"
+  value     = azuread_application_password.eso_app_password.value
+  sensitive = true
 }
